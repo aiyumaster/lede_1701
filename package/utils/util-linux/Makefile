@@ -8,24 +8,17 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=util-linux
-PKG_VERSION:=2.28
-PKG_RELEASE:=1
+PKG_VERSION:=2.25.2
+PKG_RELEASE:=4
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.xz
-PKG_SOURCE_URL:=@KERNEL/linux/utils/$(PKG_NAME)/v2.28
-PKG_HASH:=395847e2a18a2c317170f238892751e73a57104565344f8644090c8b091014bb
+PKG_SOURCE_URL:=@KERNEL/linux/utils/$(PKG_NAME)/v2.25
+PKG_MD5SUM:=cab3d7be354000f629bc601238b629b3
 
 PKG_LICENSE:=GPL-2.0
-PKG_LICENSE_FILES:=	COPYING					\
-			getopt/COPYING				\
-			libblkid/COPYING			\
-			libmount/COPYING			\
-			Documentation/licenses/COPYING.GPLv2	\
-			Documentation/licenses/COPYING.LGPLv2.1	\
-			libuuid/COPYING				\
-			Documentation/licenses/COPYING.BSD-3
+PKG_LICENSE_FILES:=COPYING getopt/COPYING libblkid/COPYING libmount/COPYING Documentation/licenses/COPYING.GPLv2 Documentation/licenses/COPYING.LGPLv2.1 libuuid/COPYING Documentation/licenses/COPYING.BSD-3
 
-PKG_BUILD_PARALLEL:=0
+PKG_BUILD_PARALLEL:=1
 
 PKG_CONFIG_DEPENDS:= \
 	CONFIG_PACKAGE_cal \
@@ -33,15 +26,52 @@ PKG_CONFIG_DEPENDS:= \
 	CONFIG_PACKAGE_setterm
 
 PKG_FIXUP:=autoreconf
-PKG_INSTALL:=1
 
 include $(INCLUDE_DIR)/package.mk
 
 define Package/util-linux/Default
   SECTION:=utils
   CATEGORY:=Utilities
-  DEPENDS:= +librt
   URL:=http://www.kernel.org/pub/linux/utils/util-linux/
+endef
+
+CONFIGURE_ARGS += \
+	--disable-rpath \
+	--enable-new-mount	\
+	--disable-tls		\
+	--disable-sulogin	\
+	--without-python	\
+	--without-udev		\
+	$(if $(CONFIG_PACKAGE_cal)$(CONFIG_PACKAGE_cfdisk)$(CONFIG_PACKAGE_setterm),--with-ncurses,--without-ncurses)
+
+TARGET_CFLAGS += $(FPIC) -std=gnu99
+
+define Build/InstallDev
+	$(MAKE) -C $(PKG_BUILD_DIR) \
+		BUILDCC="$(HOSTCC)" \
+		DESTDIR="$(1)" \
+		installdirs install-data
+
+	$(INSTALL_DIR) $(1)/usr/lib/pkgconfig
+	$(CP) $(PKG_BUILD_DIR)/libblkid/blkid.pc $(1)/usr/lib/pkgconfig
+	$(CP) $(PKG_BUILD_DIR)/libmount/mount.pc $(1)/usr/lib/pkgconfig
+	$(CP) $(PKG_BUILD_DIR)/libsmartcols/smartcols.pc $(1)/usr/lib/pkgconfig
+	$(CP) $(PKG_BUILD_DIR)/libuuid/uuid.pc $(1)/usr/lib/pkgconfig
+
+	$(INSTALL_DIR) $(1)/usr/include/blkid
+	$(CP) $(PKG_BUILD_DIR)/libblkid/src/blkid.h $(1)/usr/include/blkid
+	$(INSTALL_DIR) $(1)/usr/include/libmount
+	$(CP) $(PKG_BUILD_DIR)/libmount/src/libmount.h $(1)/usr/include/libmount
+	$(INSTALL_DIR) $(1)/usr/include/uuid
+	$(CP) $(PKG_BUILD_DIR)/libuuid/src/uuid.h $(1)/usr/include/uuid
+	$(INSTALL_DIR) $(1)/usr/include/smartcols
+	$(CP) $(PKG_BUILD_DIR)/libsmartcols/src/libsmartcols.h $(1)/usr/include/smartcols
+
+	$(INSTALL_DIR) $(1)/usr/lib
+	$(CP) $(PKG_BUILD_DIR)/.libs/libblkid.{a,so*} $(1)/usr/lib
+	$(CP) $(PKG_BUILD_DIR)/.libs/libmount.{a,so*} $(1)/usr/lib
+	$(CP) $(PKG_BUILD_DIR)/.libs/libuuid.{a,so*} $(1)/usr/lib
+	$(CP) $(PKG_BUILD_DIR)/.libs/libsmartcols.{a,so*} $(1)/usr/lib
 endef
 
 define Package/libblkid
@@ -57,18 +87,6 @@ define Package/libblkid/description
  content (e.g. filesystem type, partitions) as well as extracting additional
  information such as filesystem labels/volume names, partitions, unique
  identifiers/serial numbers...
-endef
-
-define Package/libfdisk
-$(call Package/util-linux/Default)
-  DEPENDS:=+libuuid +libblkid
-  TITLE:=partition manipulating library
-  SECTION:=libs
-  CATEGORY:=Libraries
-endef
-
-define Package/libfdisk/description
-  The libfdisk library is used for manipulating with partition tables.
 endef
 
 define Package/libmount
@@ -120,23 +138,11 @@ define Package/agetty/description
  /bin/login command
 endef
 
-define Package/blkdiscard
-$(call Package/util-linux/Default)
-  TITLE:=discard sectors on a device
-  SUBMENU=Disc
-endef
-
-define Package/blkdiscard/description
- The blkdiscard is used to discard device sectors. This is useful for
- solid-state drivers (SSDs) and thinly-provisioned storage. Unlike fstrim,
- this command is used directly on the block device.
-endef
-
 define Package/blkid
 $(call Package/util-linux/Default)
-  TITLE:=locate and print block device attributes
+  TITLE:=locate/print block device attributes
   DEPENDS:= +libblkid +libuuid
-  SUBMENU=Disc
+  SUBMENU=disc
 endef
 
 define Package/blkid/description
@@ -157,8 +163,8 @@ endef
 define Package/cfdisk
 $(call Package/util-linux/Default)
   TITLE:=display or manipulate disk partition table
-  DEPENDS:= +libblkid +libncurses +libsmartcols +libfdisk +libmount
-  SUBMENU:=Disc
+  DEPENDS:= +libblkid +libncurses +libsmartcols
+  SUBMENU:=disc
 endef
 
 define Package/cfdisk/description
@@ -168,6 +174,7 @@ endef
 define Package/dmesg
 $(call Package/util-linux/Default)
   TITLE:=print or control the kernel ring buffer
+  DEPENDS:= +librt
 endef
 
 define Package/dmesg/description
@@ -177,8 +184,8 @@ endef
 define Package/fdisk
 $(call Package/util-linux/Default)
   TITLE:=manipulate disk partition table
-  DEPENDS:= +libblkid +libsmartcols +libfdisk
-  SUBMENU=Disc
+  DEPENDS:= +libblkid +libsmartcols
+  SUBMENU=disc
 endef
 
 define Package/fdisk/description
@@ -189,7 +196,7 @@ define Package/findfs
 $(call Package/util-linux/Default)
   TITLE:=find a filesystem by label or UUID
   DEPENDS:= +libblkid
-  SUBMENU=Disc
+  SUBMENU=disc
 endef
 
 define Package/findfs/description
@@ -259,7 +266,7 @@ define Package/lsblk
 $(call Package/util-linux/Default)
   TITLE:=list block devices
   DEPENDS:= +libblkid +libmount +libsmartcols
-  SUBMENU=Disc
+  SUBMENU=disc
 endef
 
 define Package/lsblk/description
@@ -296,17 +303,6 @@ define Package/namei/description
  files, directories, and so forth)
 endef
 
-define Package/prlimit
-$(call Package/util-linux/Default)
-  TITLE:=get and set process resource limits
-  DEPENDS:= +libsmartcols
-endef
-
-define Package/prlimit/description
-  Given a process id and one or more resources, prlimit tries to retrieve
-  and/or modify the limits.
-endef
-
 define Package/rename
 $(call Package/util-linux/Default)
   TITLE:=rename files
@@ -321,7 +317,7 @@ define Package/partx-utils
 $(call Package/util-linux/Default)
   TITLE:=inform kernel about the presence and numbering of on-disk partitions
   DEPENDS:= +libblkid +libsmartcols
-  SUBMENU=Disc
+  SUBMENU=disc
 endef
 
 define Package/partx-utils/description
@@ -353,8 +349,7 @@ endef
 define Package/sfdisk
 $(call Package/util-linux/Default)
   TITLE:=partition table manipulator for Linux
-  SUBMENU=Disc
-  DEPENDS:= +libblkid +libfdisk +libsmartcols
+  SUBMENU=disc
 endef
 
 define Package/sfdisk/description
@@ -366,7 +361,7 @@ define Package/swap-utils
 $(call Package/util-linux/Default)
   TITLE:=swap space management utilities
   DEPENDS+= +libblkid
-  SUBMENU:=Filesystem
+  SUBMENU:=disc
 endef
 
 define Package/swap-utils/description
@@ -423,7 +418,7 @@ define Package/wipefs
 $(call Package/util-linux/Default)
   TITLE:=wipe a signature from a device
   DEPENDS:= +libblkid
-  SUBMENU:=Disc
+  SUBMENU:=disc
 endef
 
 define Package/wipefs/description
@@ -432,245 +427,177 @@ define Package/wipefs/description
  libblkid.
 endef
 
-CONFIGURE_ARGS += \
-	--disable-use-tty-group \
-	--disable-rpath \
-	--disable-tls		\
-	--disable-sulogin	\
-	--without-python	\
-	--without-udev		\
-	--without-readline	\
-	$(if $(CONFIG_PACKAGE_cal)$(CONFIG_PACKAGE_cfdisk)$(CONFIG_PACKAGE_setterm),--with-ncurses,--without-ncurses)
-
-TARGET_CFLAGS += $(FPIC) -std=gnu99
-
-define Build/InstallDev
-	$(INSTALL_DIR) $(1)/usr/lib/pkgconfig
-	$(CP) $(PKG_INSTALL_DIR)/usr/lib/pkgconfig/blkid.pc $(1)/usr/lib/pkgconfig
-	$(CP) $(PKG_INSTALL_DIR)/usr/lib/pkgconfig/fdisk.pc $(1)/usr/lib/pkgconfig
-	$(CP) $(PKG_INSTALL_DIR)/usr/lib/pkgconfig/mount.pc $(1)/usr/lib/pkgconfig
-	$(CP) $(PKG_INSTALL_DIR)/usr/lib/pkgconfig/smartcols.pc $(1)/usr/lib/pkgconfig
-	$(CP) $(PKG_INSTALL_DIR)/usr/lib/pkgconfig/uuid.pc $(1)/usr/lib/pkgconfig
-
-	$(INSTALL_DIR) $(1)/usr/include/blkid
-	$(CP) $(PKG_INSTALL_DIR)/usr/include/blkid/blkid.h $(1)/usr/include/blkid
-	$(INSTALL_DIR) $(1)/usr/include/libfdisk
-	$(CP) $(PKG_INSTALL_DIR)/usr/include/libfdisk/libfdisk.h $(1)/usr/include/libfdisk
-	$(INSTALL_DIR) $(1)/usr/include/libmount
-	$(CP) $(PKG_INSTALL_DIR)/usr/include/libmount/libmount.h $(1)/usr/include/libmount
-	$(INSTALL_DIR) $(1)/usr/include/uuid
-	$(CP) $(PKG_INSTALL_DIR)/usr/include/uuid/uuid.h $(1)/usr/include/uuid
-	$(INSTALL_DIR) $(1)/usr/include/libsmartcols
-	$(CP) $(PKG_INSTALL_DIR)/usr/include/libsmartcols/libsmartcols.h $(1)/usr/include/libsmartcols
-
-	$(INSTALL_DIR) $(1)/usr/lib
-	$(CP) $(PKG_INSTALL_DIR)/lib/libblkid.so* $(1)/usr/lib
-	$(CP) $(PKG_INSTALL_DIR)/lib/libfdisk.so* $(1)/usr/lib
-	$(CP) $(PKG_INSTALL_DIR)/lib/libmount.so* $(1)/usr/lib
-	$(CP) $(PKG_INSTALL_DIR)/lib/libuuid.so* $(1)/usr/lib
-	$(CP) $(PKG_INSTALL_DIR)/lib/libsmartcols.so* $(1)/usr/lib
-
-	$(LN) libblkid.so.1 $(1)/usr/lib/libblkid.so
-	$(LN) libfdisk.so.1 $(1)/usr/lib/libfdisk.so
-	$(LN) libmount.so.1 $(1)/usr/lib/libmount.so
-	$(LN) libuuid.so.1 $(1)/usr/lib/libuuid.so
-	$(LN) libsmartcols.so.1 $(1)/usr/lib/libsmartcols.so
-endef
-
-
-define Package/libfdisk/install
-	$(INSTALL_DIR) $(1)/usr/lib
-	$(CP) $(PKG_INSTALL_DIR)/lib/libfdisk.so* $(1)/usr/lib/
-	$(LN) libfdisk.so.1 $(1)/usr/lib/libfdisk.so
-endef
-
 define Package/libblkid/install
 	$(INSTALL_DIR) $(1)/usr/lib
-	$(CP) $(PKG_INSTALL_DIR)/lib/libblkid.so* $(1)/usr/lib/
-	$(LN) libblkid.so.1 $(1)/usr/lib/libblkid.so
+	$(CP) $(PKG_BUILD_DIR)/.libs/libblkid.so* $(1)/usr/lib/
 endef
 
 define Package/libmount/install
 	$(INSTALL_DIR) $(1)/usr/lib
-	$(CP) $(PKG_INSTALL_DIR)/lib/libmount.so* $(1)/usr/lib/
-	$(LN) libmount.so.1 $(1)/usr/lib/libmount.so
+	$(CP) $(PKG_BUILD_DIR)/.libs/libmount.so* $(1)/usr/lib/
 endef
 
 define Package/libsmartcols/install
 	$(INSTALL_DIR) $(1)/usr/lib
-	$(CP) $(PKG_INSTALL_DIR)/lib/libsmartcols.so* $(1)/usr/lib/
-	$(LN) libsmartcols.so.1 $(1)/usr/lib/libsmartcols.so
+	$(CP) $(PKG_BUILD_DIR)/.libs/libsmartcols.so* $(1)/usr/lib/
 endef
 
 define Package/libuuid/install
 	$(INSTALL_DIR) $(1)/usr/lib
-	$(CP) $(PKG_INSTALL_DIR)/lib/libuuid.so* $(1)/usr/lib/
-	$(LN) libuuid.so.1 $(1)/usr/lib/libuuid.so
+	$(CP) $(PKG_BUILD_DIR)/.libs/libuuid.so* $(1)/usr/lib/
 endef
 
 define Package/agetty/install
 	$(INSTALL_DIR) $(1)/usr/sbin
-	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/sbin/agetty $(1)/usr/sbin/
-endef
-
-define Package/blkdiscard/install
-	$(INSTALL_DIR) $(1)/usr/sbin
-	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/sbin/blkdiscard $(1)/usr/sbin/
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/agetty $(1)/usr/sbin/
 endef
 
 define Package/blkid/install
 	$(INSTALL_DIR) $(1)/usr/sbin
-	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/sbin/blkid $(1)/usr/sbin/
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/.libs/blkid $(1)/usr/sbin/
 endef
 
 define Package/cal/install
 	$(INSTALL_DIR) $(1)/usr/bin
-	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/bin/cal $(1)/usr/bin/
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/cal $(1)/usr/bin/
 endef
 
 define Package/cfdisk/install
 	$(INSTALL_DIR) $(1)/usr/sbin
-	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/sbin/cfdisk $(1)/usr/sbin/
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/.libs/cfdisk $(1)/usr/sbin/
 endef
 
 define Package/dmesg/install
-	$(INSTALL_DIR) $(1)/usr/bin
-	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/bin/dmesg $(1)/usr/bin/
+	$(INSTALL_DIR) $(1)/usr/sbin
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/dmesg $(1)/usr/sbin/
 endef
 
 define Package/fdisk/install
 	$(INSTALL_DIR) $(1)/usr/sbin
-	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/sbin/fdisk $(1)/usr/sbin/
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/.libs/fdisk $(1)/usr/sbin/
 endef
 
 define Package/findfs/install
 	$(INSTALL_DIR) $(1)/usr/sbin
-	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/sbin/findfs $(1)/usr/sbin/
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/.libs/findfs $(1)/usr/sbin/
 endef
 
 define Package/flock/install
 	$(INSTALL_DIR) $(1)/usr/bin
-	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/bin/flock $(1)/usr/bin/
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/flock $(1)/usr/bin/
 endef
 
 define Package/getopt/install
 	$(INSTALL_DIR) $(1)/usr/bin
-	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/bin/getopt $(1)/usr/bin/
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/getopt $(1)/usr/bin/
 endef
 
 define Package/hwclock/install
 	$(INSTALL_DIR) $(1)/usr/sbin
-	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/sbin/hwclock $(1)/usr/sbin/
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/hwclock $(1)/usr/sbin/
 endef
 
 define Package/logger/install
 	$(INSTALL_DIR) $(1)/usr/bin
-	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/bin/logger $(1)/usr/bin/
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/logger $(1)/usr/bin/
 endef
 
 define Package/look/install
 	$(INSTALL_DIR) $(1)/usr/bin
-	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/bin/look $(1)/usr/bin/
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/look $(1)/usr/bin/
 endef
 
 define Package/losetup/install
 	$(INSTALL_DIR) $(1)/usr/sbin
-	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/sbin/losetup $(1)/usr/sbin/
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/.libs/losetup $(1)/usr/sbin/
 endef
 
 define Package/lsblk/install
 	$(INSTALL_DIR) $(1)/usr/bin
-	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/bin/lsblk $(1)/usr/bin/
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/.libs/lsblk $(1)/usr/bin/
 endef
 
 define Package/mcookie/install
 	$(INSTALL_DIR) $(1)/usr/bin
-	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/bin/mcookie $(1)/usr/bin/
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/mcookie $(1)/usr/bin/
 endef
 
 define Package/mount-utils/install
 	$(INSTALL_DIR) $(1)/usr/bin
-	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/bin/{u,}mount $(1)/usr/bin/
-	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/bin/mountpoint $(1)/usr/bin/
-	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/bin/findmnt $(1)/usr/bin/
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/.libs/{u,}mount $(1)/usr/bin/
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/.libs/mountpoint $(1)/usr/bin/
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/.libs/findmnt $(1)/usr/bin/
 endef
 
 define Package/namei/install
 	$(INSTALL_DIR) $(1)/usr/bin
-	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/bin/namei $(1)/usr/bin/
-endef
-
-define Package/prlimit/install
-	$(INSTALL_DIR) $(1)/usr/bin
-	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/bin/prlimit $(1)/usr/bin/
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/namei $(1)/usr/bin/
 endef
 
 define Package/rename/install
 	$(INSTALL_DIR) $(1)/usr/bin
-	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/bin/rename $(1)/usr/bin/
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/rename $(1)/usr/bin/
 endef
 
 define Package/partx-utils/install
 	$(INSTALL_DIR) $(1)/usr/sbin
-	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/sbin/partx $(1)/usr/sbin/
-	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/sbin/addpart $(1)/usr/sbin/
-	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/sbin/delpart $(1)/usr/sbin/
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/.libs/partx $(1)/usr/sbin/
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/addpart $(1)/usr/sbin/
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/delpart $(1)/usr/sbin/
 endef
 
 define Package/script-utils/install
 	$(INSTALL_DIR) $(1)/usr/bin
-	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/bin/script $(1)/usr/bin/
-	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/bin/scriptreplay $(1)/usr/bin/
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/script $(1)/usr/bin/
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/scriptreplay $(1)/usr/bin/
 endef
 
 define Package/setterm/install
 	$(INSTALL_DIR) $(1)/usr/bin
-	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/bin/setterm $(1)/usr/bin/
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/setterm $(1)/usr/bin/
 endef
 
 define Package/sfdisk/install
 	$(INSTALL_DIR) $(1)/usr/sbin
-	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/sbin/sfdisk $(1)/usr/sbin/
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/sfdisk $(1)/usr/sbin/
 endef
 
 define Package/swap-utils/install
 	$(INSTALL_DIR) $(1)/usr/sbin
-	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/sbin/mkswap $(1)/usr/sbin/
-	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/sbin/swaplabel $(1)/usr/sbin/
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/.libs/mkswap $(1)/usr/sbin/
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/.libs/swaplabel $(1)/usr/sbin/
 endef
 
 define Package/uuidd/install
 	$(INSTALL_DIR) $(1)/usr/sbin
-	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/sbin//uuidd $(1)/usr/sbin/
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/.libs/uuidd $(1)/usr/sbin/
 endef
 
 define Package/uuidgen/install
 	$(INSTALL_DIR) $(1)/usr/bin
-	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/bin//uuidgen $(1)/usr/bin/
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/.libs/uuidgen $(1)/usr/bin/
 endef
 
 define Package/wall/install
 	$(INSTALL_DIR) $(1)/usr/bin
-	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/bin/wall $(1)/usr/bin/
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/wall $(1)/usr/bin/
 endef
 
 define Package/whereis/install
 	$(INSTALL_DIR) $(1)/usr/bin
-	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/bin/whereis $(1)/usr/bin/
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/whereis $(1)/usr/bin/
 endef
 
 define Package/wipefs/install
 	$(INSTALL_DIR) $(1)/usr/sbin
-	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/sbin/wipefs $(1)/usr/sbin/
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/.libs/wipefs $(1)/usr/sbin/
 endef
 
 $(eval $(call BuildPackage,libblkid))
-$(eval $(call BuildPackage,libfdisk))
 $(eval $(call BuildPackage,libmount))
 $(eval $(call BuildPackage,libsmartcols))
 $(eval $(call BuildPackage,libuuid))
 $(eval $(call BuildPackage,agetty))
-$(eval $(call BuildPackage,blkdiscard))
 $(eval $(call BuildPackage,blkid))
 $(eval $(call BuildPackage,cal))
 $(eval $(call BuildPackage,cfdisk))
@@ -687,7 +614,6 @@ $(eval $(call BuildPackage,lsblk))
 $(eval $(call BuildPackage,mcookie))
 $(eval $(call BuildPackage,mount-utils))
 $(eval $(call BuildPackage,namei))
-$(eval $(call BuildPackage,prlimit))
 $(eval $(call BuildPackage,rename))
 $(eval $(call BuildPackage,partx-utils))
 $(eval $(call BuildPackage,script-utils))

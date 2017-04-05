@@ -14,6 +14,7 @@ platform_check_image() {
 	[ "$#" -gt 1 ] && return 1
 
 	case "$board" in
+	mt7620a_dts|\
 	3g150b|\
 	3g300m|\
 	a5-v11|\

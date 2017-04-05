@@ -13,6 +13,9 @@ ramips_board_detect() {
 	machine=$(awk 'BEGIN{FS="[ \t]+:[ \t]"} /machine/ {print $2}' /proc/cpuinfo)
 
 	case "$machine" in
+	*"MT7620a DTS"*)
+		name="mt7620a_dts"
+		;;
 	*"11AC NAS Router")
 		name="11acnas"
 		;;

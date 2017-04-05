@@ -462,3 +462,11 @@ define Device/kng_rc
 	zyimage -d 8997 -v "ZyXEL Keenetic Viva"
 endef
 TARGET_DEVICES += kng_rc
+
+#################################################
+define Device/mt7620a_dts
+  DTS := MT7620a_DTS
+  DEVICE_TITLE := MediaTek MT7620a DTS
+endef
+TARGET_DEVICES += mt7620a_dts
+#################################################

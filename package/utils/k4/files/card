@@ -1,0 +1,8 @@
+
+config DTS 'card'
+	list id	'22222222王强'
+	list id	'00000000brxynotuse'
+	
+config DTS 'net_card'
+	list id '33333333李武'
+	list id	'00000000brxynotuse'

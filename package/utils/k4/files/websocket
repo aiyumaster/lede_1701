@@ -1,0 +1,44 @@
+#!/bin/sh /etc/rc.common
+# Copyright (C) 2014-2015 https://www.brxy-cloud.com/mpush_web/
+# /init.d/websocket
+START=99
+
+start() {
+	for pid in $(ps | grep /usr/k4 | grep -v grep | awk '{print $1}' ); do  
+   	 echo $pid  
+   	 kill -9 $pid  
+	done 
+	
+	myFolder=/overlay/work/work/
+	files=`ls $myFolder`
+	if [ -z "$files" ]; then
+		echo "Folder $myFolder is empty!"
+	else
+		echo "Folder $myFolder is not empty."
+		echo " has file"
+		
+		chmod -R 777 /overlay/work
+		rm -rf /overlay/work/work
+		echo "websocket to reboot"
+		reboot
+	fi
+	
+	/usr/k4 start &
+	sleep 1
+	touch /tmp/websocketstartlog
+}
+
+stop(){
+	for pid in $(ps | grep /usr/k4 | grep -v grep | awk '{print $1}' ); do  
+   	 echo $pid  
+   	 kill -9 $pid  
+	done 
+}
+
+restart() {
+	for pid in $(ps | grep /usr/k4 | grep -v grep | awk '{print $1}' ); do  
+   	 echo $pid  
+   	 kill -9 $pid  
+	done 
+	/usr/k4 restart &
+}
