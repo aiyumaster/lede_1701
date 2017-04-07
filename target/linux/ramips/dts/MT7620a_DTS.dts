@@ -90,6 +90,10 @@
 	&ehci {
 		status = "okay";
 	};
+	
+	&ohci {
+		status = "okay";
+	};
 
 	&uart {
 		status = "okay";
@@ -97,4 +101,7 @@
 
 	&uartlite {
 		status = "okay";
+		
+		pinctrl-names = "default";
+		pinctrl-0 = <&uartf_gpio_pins>;
 	};
